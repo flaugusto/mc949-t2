@@ -115,16 +115,21 @@ def triangulate_points(R, t, pts1, pts2, K):
     # The second camera's pose is defined by R and t
     P2 = K @ np.hstack((R, t))
 
+    # Convert points to the correct format for triangulatePoints
+    # The function expects 2xN arrays of 2D points
+    pts1_norm = cv2.undistortPoints(pts1.astype(np.float32), K, None)
+    pts2_norm = cv2.undistortPoints(pts2.astype(np.float32), K, None)
+    
+    # Reshape to 2xN arrays
+    pts1_reshaped = pts1_norm.reshape(-1, 2).T
+    pts2_reshaped = pts2_norm.reshape(-1, 2).T
+    
     # Triangulate points
-    # The points need to be in homogeneous coordinates for triangulation
-    pts1_hom = cv2.convertPointsToHomogeneous(pts1)[:, 0, :]
-    pts2_hom = cv2.convertPointsToHomogeneous(pts2)[:, 0, :]
-
-    points_4d_hom = cv2.triangulatePoints(P1, P2, pts1_hom.T, pts2_hom.T)
+    points_4d_hom = cv2.triangulatePoints(P1, P2, pts1_reshaped, pts2_reshaped)
 
     # Convert from homogeneous to 3D Cartesian coordinates
-    points_3d = points_4d_hom[:3, :] / points_4d_hom[3, :]
-    return points_3d.T
+    points_3d = points_4d_hom / points_4d_hom[3]
+    return points_3d[:3].T
 
 def save_ply(points_3d, filename):
     """Saves a 3D point cloud to a .ply file."""
@@ -205,4 +210,4 @@ if __name__ == "__main__":
     save_ply(points_3d, output_path)
 
     print("\nPipeline finished.")
-    print(f"Run 'python visualize_point_cloud.py {output_path}' to see the result.")
+    print(f"Run 'python point_visualizer.py {output_path}' to see the result.")

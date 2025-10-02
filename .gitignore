@@ -1,1 +1,13 @@
 .vscode
+images
+final_images
+object_images
+.DS_Store
+*.aux
+*.blg
+*.bbl
+*.fdb_latexmk
+*.fls
+*.log
+*.gz
+*.pdf

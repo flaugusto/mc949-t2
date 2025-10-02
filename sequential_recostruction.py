@@ -27,7 +27,7 @@ import glob
 
 # --- Configuration ---
 # Path to the folder containing your images
-IMAGE_FOLDER = 'images/'
+IMAGE_FOLDER = 'final_images'
 OUTPUT_FOLDER = 'output'
 OUTPUT_FILENAME = 'sequential_sparse_cloud.ply'
 
@@ -35,7 +35,7 @@ OUTPUT_FILENAME = 'sequential_sparse_cloud.ply'
 K = None
 
 # SIFT and FLANN parameters
-SIFT_FEATURES = 4000
+SIFT_FEATURES = 16000
 FLANN_INDEX_KDTREE = 1
 FLANN_TREES = 5
 FLANN_CHECKS = 50
@@ -45,7 +45,7 @@ LOWE_RATIO = 0.75
 
 def load_images_from_folder(folder_path):
     """Loads all images from a folder in sorted order."""
-    image_paths = sorted(glob.glob(os.path.join(folder_path, '*.[jJ][pP][gG]')))
+    image_paths = sorted(glob.glob(os.path.join(folder_path, '*.[pP][nN][gG]')))
     images = [cv2.imread(path) for path in image_paths]
     images = [img for img in images if img is not None]
     if len(images) < 2:
@@ -95,14 +95,34 @@ def estimate_pose(kp1, kp2, matches, K):
     _, R, t, mask_pose = cv2.recoverPose(E, pts1, pts2, K, mask=mask)
     return R, t, pts1[mask_pose.ravel() == 1], pts2[mask_pose.ravel() == 1]
 
-def triangulate_points(P1, P2, pts1, pts2):
-    """Triangulates 3D points from 2D correspondences and projection matrices."""
-    pts1_hom = cv2.convertPointsToHomogeneous(pts1)[:, 0, :]
-    pts2_hom = cv2.convertPointsToHomogeneous(pts2)[:, 0, :]
+def triangulate_points(P1, P2, pts1, pts2, K=None):
+    """
+    Triangulates 3D points from 2D correspondences and projection matrices.
     
-    points_4d_hom = cv2.triangulatePoints(P1, P2, pts1_hom.T, pts2_hom.T)
-    points_3d = points_4d_hom[:3, :] / points_4d_hom[3, :]
-    return points_3d.T
+    Args:
+        P1, P2: 3x4 projection matrices
+        pts1, pts2: Nx2 arrays of corresponding image points
+        K: Optional camera matrix for undistortion
+    """
+    # Convert points to the correct format for triangulatePoints
+    if K is not None:
+        # Undistort points if camera matrix is provided
+        pts1_norm = cv2.undistortPoints(pts1.astype(np.float32), K, None).reshape(-1, 2)
+        pts2_norm = cv2.undistortPoints(pts2.astype(np.float32), K, None).reshape(-1, 2)
+    else:
+        pts1_norm = pts1.astype(np.float32)
+        pts2_norm = pts2.astype(np.float32)
+    
+    # Reshape to 2xN arrays as required by triangulatePoints
+    pts1_reshaped = pts1_norm.T
+    pts2_reshaped = pts2_norm.T
+    
+    # Triangulate points
+    points_4d_hom = cv2.triangulatePoints(P1, P2, pts1_reshaped, pts2_reshaped)
+    
+    # Convert from homogeneous to 3D coordinates
+    points_3d = points_4d_hom / points_4d_hom[3]
+    return points_3d[:3].T
 
 def save_ply(points_3d, filename):
     """Saves a 3D point cloud to a .ply file."""
@@ -222,4 +242,4 @@ if __name__ == "__main__":
     
     print("\nPipeline finished.")
     print(f"Total points in cloud: {len(final_points)}")
-    print(f"Run 'python visualize_point_cloud.py {output_path}' to see the result.")
+    print(f"Run 'python point_visualizer.py {output_path}' to see the result.")
